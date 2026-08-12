@@ -14,6 +14,7 @@ namespace Magebit\AgenticCore\Test\Unit\Model\Quote;
 
 use Magebit\AgenticCore\Model\Quote\AddressWriter;
 use Magebit\AgenticCore\Model\Quote\PostalAddress;
+use Magebit\AgenticCore\Model\Quote\RegionResolver;
 use Magento\Quote\Model\Quote\Address;
 use PHPUnit\Framework\TestCase;
 
@@ -26,7 +27,12 @@ class AddressWriterTest extends TestCase
      */
     protected function setUp(): void
     {
-        $this->writer = new AddressWriter();
+        $resolver = $this->createMock(RegionResolver::class);
+        $resolver->method('resolve')->willReturnCallback(
+            static fn (string $countryId, string $region): ?int => $region === 'Greater London' ? 271 : null
+        );
+
+        $this->writer = new AddressWriter($resolver);
     }
 
     /**
@@ -51,7 +57,7 @@ class AddressWriterTest extends TestCase
 
         $this->assertSame(['1 Analytical Way', 'Suite 2'], $address->getStreet());
         $this->assertSame('London', $address->getCity());
-        $this->assertSame('Greater London', $address->getRegion());
+        $this->assertSame('Greater London', $address->getData('region'));
         $this->assertSame('GB', $address->getCountryId());
         $this->assertSame('SW1A 1AA', $address->getPostcode());
         $this->assertSame('Ada', $address->getFirstname());
@@ -89,6 +95,52 @@ class AddressWriterTest extends TestCase
         $this->writer->write($address, new PostalAddress(streetLine: '1 Analytical Way'));
 
         $this->assertSame(['1 Analytical Way'], $address->getStreet());
+    }
+
+    /**
+     * Placing an order needs the region's row id, not its name: Magento rejects an address that carries
+     * only the name with "regionId is required", so writing the name alone made completion unreachable.
+     *
+     * @return void
+     */
+    public function testTheRegionIdIsResolvedFromTheRegionName(): void
+    {
+        $address = $this->address();
+
+        $this->writer->write($address, new PostalAddress(region: 'Greater London', country: 'GB'));
+
+        $this->assertSame(271, $address->getData('region_id'));
+    }
+
+    /**
+     * The country can have arrived on an earlier request, so the region has to be resolved against the
+     * address as it now stands rather than against this payload alone.
+     *
+     * @return void
+     */
+    public function testTheRegionResolvesAgainstACountrySetEarlier(): void
+    {
+        $address = $this->address();
+        $address->setCountryId('GB');
+
+        $this->writer->write($address, new PostalAddress(region: 'Greater London'));
+
+        $this->assertSame(271, $address->getData('region_id'));
+    }
+
+    /**
+     * An unknown region must not be given an id, which would silently attach the address to whatever
+     * region that id belongs to.
+     *
+     * @return void
+     */
+    public function testAnUnresolvableRegionLeavesTheIdUnset(): void
+    {
+        $address = $this->address();
+
+        $this->writer->write($address, new PostalAddress(region: 'Atlantis', country: 'GB'));
+
+        $this->assertNull($address->getData('region_id'));
     }
 
     /**

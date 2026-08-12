@@ -21,6 +21,14 @@ use Magento\Quote\Model\Quote\Address;
 class AddressWriter
 {
     /**
+     * @param RegionResolver $regionResolver
+     */
+    public function __construct(
+        private readonly RegionResolver $regionResolver
+    ) {
+    }
+
+    /**
      * @param Address $address
      * @param PostalAddress $source
      * @return void
@@ -47,6 +55,33 @@ class AddressWriter
         $this->set($source->lastName, fn (string $value) => $address->setLastname($value));
         $this->set($source->phone, fn (string $value) => $address->setTelephone($value));
         $this->set($source->email, fn (string $value) => $address->setEmail($value));
+
+        $this->writeRegionId($address);
+    }
+
+    /**
+     * Placing an order needs the region's row id, which no wire address carries. Resolved from the
+     * address as it now stands, because the country and the region can arrive on different requests.
+     *
+     * @param Address $address
+     * @return void
+     */
+    private function writeRegionId(Address $address): void
+    {
+        $countryId = (string) $address->getCountryId();
+        $region = $address->getData('region');
+
+        if (!is_string($region)) {
+            return;
+        }
+
+        $regionId = $this->regionResolver->resolve($countryId, $region);
+
+        // Left unset when the country has no such region: an id guessed here would attach the address
+        // to whichever region owns it, and Magento's own validation reports the miss.
+        if ($regionId !== null) {
+            $address->setRegionId($regionId);
+        }
     }
 
     /**
