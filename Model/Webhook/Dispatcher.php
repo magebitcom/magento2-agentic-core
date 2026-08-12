@@ -14,7 +14,7 @@ namespace Magebit\AgenticCore\Model\Webhook;
 
 use Magebit\AgenticCore\Api\Data\WebhookDeliveryInterface;
 use Magebit\AgenticCore\Api\Data\WebhookDeliveryInterfaceFactory;
-use Magebit\AgenticCore\Api\Webhook\SecretProviderInterface;
+use Magebit\AgenticCore\Api\Webhook\DeliveryHeadersProviderInterface;
 use Magebit\AgenticCore\Api\WebhookDeliveryRepositoryInterface;
 use Magento\Framework\Exception\CouldNotSaveException;
 use Magento\Framework\Stdlib\DateTime\DateTime;
@@ -42,18 +42,16 @@ class Dispatcher
     /**
      * @param WebhookDeliveryRepositoryInterface $repository
      * @param WebhookDeliveryInterfaceFactory $deliveryFactory
-     * @param Signer $signer
      * @param Sender $sender
-     * @param SecretProviderInterface $secretProvider
+     * @param DeliveryHeadersProviderInterface $headersProvider
      * @param DateTime $dateTime
      * @param LoggerInterface $logger
      */
     public function __construct(
         private readonly WebhookDeliveryRepositoryInterface $repository,
         private readonly WebhookDeliveryInterfaceFactory $deliveryFactory,
-        private readonly Signer $signer,
         private readonly Sender $sender,
-        private readonly SecretProviderInterface $secretProvider,
+        private readonly DeliveryHeadersProviderInterface $headersProvider,
         private readonly DateTime $dateTime,
         private readonly LoggerInterface $logger
     ) {
@@ -112,13 +110,15 @@ class Dispatcher
     private function attempt(WebhookDeliveryInterface $delivery, string $scope, int $now): bool
     {
         $payload = (string) $delivery->getPayload();
-        $signature = $this->signer->sign($payload, $now, $this->secretProvider->getSecret($scope));
+        $reference = (string) $delivery->getReference();
 
         $result = $this->sender->send(
             (string) $delivery->getUrl(),
             $payload,
-            $signature,
-            (string) $delivery->getReference()
+            // Built per attempt, not per enqueue: a row that waited out a backoff would otherwise
+            // arrive with a timestamp outside the receiver's skew window.
+            $this->headersProvider->getHeaders($scope, $payload, $now, $reference),
+            $reference
         );
 
         $attempts = (int) $delivery->getAttempts() + 1;

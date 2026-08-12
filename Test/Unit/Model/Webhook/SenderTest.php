@@ -33,7 +33,7 @@ class SenderTest extends TestCase
         $curl->method('getStatus')->willReturn($status);
         $curl->method('getBody')->willReturn('');
 
-        $result = $this->senderWith($curl)->send('https://example.test/hook', '{}', 't=1,v1=x', 'ref-1');
+        $result = $this->senderWith($curl)->send('https://example.test/hook', '{}', [], 'ref-1');
 
         $this->assertSame($expected, $result->outcome);
         $this->assertSame($status, $result->status);
@@ -66,7 +66,7 @@ class SenderTest extends TestCase
         $curl = $this->createMock(Curl::class);
         $curl->method('post')->willThrowException(new \Exception('Could not resolve host'));
 
-        $result = $this->senderWith($curl)->send('https://example.test/hook', '{}', 't=1,v1=x', 'ref-1');
+        $result = $this->senderWith($curl)->send('https://example.test/hook', '{}', [], 'ref-1');
 
         $this->assertSame(SendOutcome::Retryable, $result->outcome);
         $this->assertSame(0, $result->status);
@@ -74,9 +74,12 @@ class SenderTest extends TestCase
     }
 
     /**
+     * The caller's headers pass through untouched, whatever it names them, and the transport adds only
+     * what is its own business.
+     *
      * @return void
      */
-    public function testTheSignatureAndReferenceAreSentAsHeaders(): void
+    public function testTheCallersHeadersArePassedThroughWithTheTransportsOwn(): void
     {
         $headers = [];
         $curl = $this->createMock(Curl::class);
@@ -87,10 +90,15 @@ class SenderTest extends TestCase
             }
         );
 
-        $this->senderWith($curl)->send('https://example.test/hook', '{"a":1}', 't=1,v1=x', 'ref-1');
+        $this->senderWith($curl)->send(
+            'https://example.test/hook',
+            '{"a":1}',
+            ['Some-Signature' => 'abc', 'Some-Id' => 'ref-1'],
+            'ref-1'
+        );
 
-        $this->assertSame('t=1,v1=x', $headers['Merchant-Signature']);
-        $this->assertSame('ref-1', $headers['Request-Id']);
+        $this->assertSame('abc', $headers['Some-Signature']);
+        $this->assertSame('ref-1', $headers['Some-Id']);
         $this->assertSame('application/json', $headers['Content-Type']);
         $this->assertSame('7', $headers['Content-Length']);
     }

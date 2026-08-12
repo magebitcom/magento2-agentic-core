@@ -14,14 +14,13 @@ namespace Magebit\AgenticCore\Test\Unit\Model\Webhook;
 
 use Magebit\AgenticCore\Api\Data\WebhookDeliveryInterface;
 use Magebit\AgenticCore\Api\Data\WebhookDeliveryInterfaceFactory;
-use Magebit\AgenticCore\Api\Webhook\SecretProviderInterface;
+use Magebit\AgenticCore\Api\Webhook\DeliveryHeadersProviderInterface;
 use Magebit\AgenticCore\Api\WebhookDeliveryRepositoryInterface;
 use Magebit\AgenticCore\Model\Webhook\Delivery\Record;
 use Magebit\AgenticCore\Model\Webhook\Dispatcher;
 use Magebit\AgenticCore\Model\Webhook\Sender;
 use Magebit\AgenticCore\Model\Webhook\SendOutcome;
 use Magebit\AgenticCore\Model\Webhook\SendResult;
-use Magebit\AgenticCore\Model\Webhook\Signer;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -31,12 +30,11 @@ class DispatcherTest extends TestCase
 {
     private const NOW_TIMESTAMP = 1767225600;
     private const SCOPE = 'one';
-    private const SECRET = 'shhh';
     private const PAYLOAD = '{"a":1}';
 
     private WebhookDeliveryRepositoryInterface&MockObject $repository;
 
-    private Signer&MockObject $signer;
+    private DeliveryHeadersProviderInterface&MockObject $headersProvider;
 
     private Sender&MockObject $sender;
 
@@ -48,11 +46,10 @@ class DispatcherTest extends TestCase
     protected function setUp(): void
     {
         $this->repository = $this->createMock(WebhookDeliveryRepositoryInterface::class);
-        $this->signer = $this->createMock(Signer::class);
         $this->sender = $this->createMock(Sender::class);
 
-        $secretProvider = $this->createMock(SecretProviderInterface::class);
-        $secretProvider->method('getSecret')->willReturn(self::SECRET);
+        $this->headersProvider = $this->createMock(DeliveryHeadersProviderInterface::class);
+        $this->headersProvider->method('getHeaders')->willReturn(['Some-Signature' => 'abc']);
 
         $dateTime = $this->createMock(DateTime::class);
         $dateTime->method('gmtTimestamp')->willReturn(self::NOW_TIMESTAMP);
@@ -64,9 +61,8 @@ class DispatcherTest extends TestCase
         $this->dispatcher = new Dispatcher(
             $this->repository,
             $this->createMock(WebhookDeliveryInterfaceFactory::class),
-            $this->signer,
             $this->sender,
-            $secretProvider,
+            $this->headersProvider,
             $dateTime,
             $this->createMock(LoggerInterface::class)
         );
@@ -148,20 +144,23 @@ class DispatcherTest extends TestCase
     }
 
     /**
-     * The signature has to cover the payload as sent, with the timestamp of the attempt rather than of
-     * the enqueue — otherwise a row that waited out a backoff arrives outside the receiver's skew window.
+     * The headers have to be built for the payload as sent, with the timestamp of the attempt rather
+     * than of the enqueue — otherwise a row that waited out a backoff arrives outside the receiver's
+     * skew window.
      *
      * @return void
      */
-    public function testTheSignatureIsComputedAtSendTime(): void
+    public function testTheHeadersAreBuiltAtSendTime(): void
     {
         $this->pending(0);
-        $this->signer->expects($this->once())
-            ->method('sign')
-            ->with(self::PAYLOAD, self::NOW_TIMESTAMP, self::SECRET);
-        $this->sender->method('send')->willReturn(new SendResult(SendOutcome::Delivered, 200));
 
-        $this->dispatcher->dispatchDue(self::SCOPE);
+        $provider = $this->createMock(DeliveryHeadersProviderInterface::class);
+        $provider->expects($this->once())
+            ->method('getHeaders')
+            ->with(self::SCOPE, self::PAYLOAD, self::NOW_TIMESTAMP, 'ref-1')
+            ->willReturn([]);
+
+        $this->dispatcherWith($provider)->dispatchDue(self::SCOPE);
     }
 
     /**
@@ -173,6 +172,32 @@ class DispatcherTest extends TestCase
         $this->sender->expects($this->never())->method('send');
 
         $this->assertSame(0, $this->dispatcher->dispatchDue(self::SCOPE));
+    }
+
+    /**
+     * @param DeliveryHeadersProviderInterface $headersProvider
+     * @return Dispatcher
+     */
+    private function dispatcherWith(DeliveryHeadersProviderInterface $headersProvider): Dispatcher
+    {
+        $dateTime = $this->createMock(DateTime::class);
+        $dateTime->method('gmtTimestamp')->willReturn(self::NOW_TIMESTAMP);
+        $dateTime->method('gmtDate')->willReturnCallback(
+            static fn (string $format = 'Y-m-d H:i:s', $input = null): string
+                => gmdate($format, is_int($input) ? $input : self::NOW_TIMESTAMP)
+        );
+
+        $sender = $this->createMock(Sender::class);
+        $sender->method('send')->willReturn(new SendResult(SendOutcome::Delivered, 200));
+
+        return new Dispatcher(
+            $this->repository,
+            $this->createMock(WebhookDeliveryInterfaceFactory::class),
+            $sender,
+            $headersProvider,
+            $dateTime,
+            $this->createMock(LoggerInterface::class)
+        );
     }
 
     /**

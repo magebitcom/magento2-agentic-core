@@ -36,18 +36,21 @@ class Sender
     /**
      * @param string $url
      * @param string $payload
-     * @param string $signature
-     * @param string $reference Caller's correlation id, sent as Request-Id
+     * @param array<string, string> $headers Caller's headers; Content-Type and Content-Length are added
+     * @param string $reference Caller's correlation id, for logging only
      * @return SendResult
      */
-    public function send(string $url, string $payload, string $signature, string $reference): SendResult
+    public function send(string $url, string $payload, array $headers, string $reference): SendResult
     {
         /** @var Curl $curl */
         $curl = $this->curlFactory->create();
 
         try {
-            $curl->addHeader('Merchant-Signature', $signature);
-            $curl->addHeader('Request-Id', $reference);
+            foreach ($headers as $name => $value) {
+                $curl->addHeader($name, $value);
+            }
+
+            // Transport concerns rather than caller vocabulary, so they are not the provider's to set.
             $curl->addHeader('Content-Type', 'application/json');
             $curl->addHeader('Content-Length', (string) strlen($payload));
             $curl->post($url, $payload);
