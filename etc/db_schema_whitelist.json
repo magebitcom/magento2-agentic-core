@@ -1,0 +1,21 @@
+{
+    "agentic_idempotency": {
+        "column": {
+            "entity_id": true,
+            "scope": true,
+            "idempotency_key": true,
+            "request_hash": true,
+            "response_status": true,
+            "response_body": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "AGENTIC_IDEMPOTENCY_CREATED_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AGENTIC_IDEMPOTENCY_SCOPE_IDEMPOTENCY_KEY": true
+        }
+    }
+}

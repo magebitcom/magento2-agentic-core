@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * This file is part of the Magebit_AgenticCore package.
+ *
+ * @copyright Copyright (c) 2026 Magebit, Ltd. (https://magebit.com/)
+ * @author    Magebit <info@magebit.com>
+ * @license   MIT
+ */
+-->
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="agentic_idempotency" resource="default" engine="innodb" comment="Idempotent request records, partitioned by caller scope">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="varchar" name="scope" nullable="false" length="32" comment="Which caller owns this row"/>
+        <column xsi:type="varchar" name="idempotency_key" nullable="false" length="255" comment="Key the caller supplied"/>
+        <column xsi:type="varchar" name="request_hash" nullable="false" length="64" comment="Canonical hash of the request the key was claimed for"/>
+        <column xsi:type="int" name="response_status" nullable="true" unsigned="true" comment="Response status (NULL while the claim is in flight)"/>
+        <column xsi:type="text" name="response_body" nullable="true" comment="Response body, exactly as it must be replayed"/>
+        <column xsi:type="datetime" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="datetime" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="AGENTIC_IDEMPOTENCY_SCOPE_IDEMPOTENCY_KEY">
+            <column name="scope"/>
+            <column name="idempotency_key"/>
+        </constraint>
+        <index referenceId="AGENTIC_IDEMPOTENCY_CREATED_AT_IDX" indexType="btree">
+            <column name="created_at"/>
+        </index>
+    </table>
+</schema>
