@@ -38,5 +38,22 @@
         "constraint": {
             "PRIMARY": true
         }
+    },
+    "agentic_checkout_order_link": {
+        "column": {
+            "entity_id": true,
+            "scope": true,
+            "session_id": true,
+            "quote_id": true,
+            "order_id": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AGENTIC_CHECKOUT_ORDER_LINK_SCOPE_SESSION_ID": true,
+            "AGENTIC_CHECKOUT_ORDER_LINK_QUOTE_ID_QUOTE_ENTITY_ID": true,
+            "AGENTIC_CHECKOUT_ORDER_LINK_ORDER_ID_SALES_ORDER_ENTITY_ID": true
+        }
     }
 }
