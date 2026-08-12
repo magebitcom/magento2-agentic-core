@@ -17,5 +17,26 @@
             "PRIMARY": true,
             "AGENTIC_IDEMPOTENCY_SCOPE_IDEMPOTENCY_KEY": true
         }
+    },
+    "agentic_webhook_delivery": {
+        "column": {
+            "entity_id": true,
+            "scope": true,
+            "url": true,
+            "payload": true,
+            "reference": true,
+            "attempts": true,
+            "next_attempt_at": true,
+            "status": true,
+            "last_error": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "AGENTIC_WEBHOOK_DELIVERY_SCOPE_STATUS_NEXT_ATTEMPT_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
     }
 }

@@ -11,4 +11,9 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
     <preference for="Magebit\AgenticCore\Api\Data\IdempotencyRecordInterface" type="Magebit\AgenticCore\Model\Idempotency\Record"/>
     <preference for="Magebit\AgenticCore\Api\IdempotencyRecordRepositoryInterface" type="Magebit\AgenticCore\Model\Idempotency\Repository"/>
+
+    <preference for="Magebit\AgenticCore\Api\Data\WebhookDeliveryInterface" type="Magebit\AgenticCore\Model\Webhook\Delivery\Record"/>
+    <preference for="Magebit\AgenticCore\Api\WebhookDeliveryRepositoryInterface" type="Magebit\AgenticCore\Model\Webhook\Delivery\Repository"/>
+    <!-- SecretProviderInterface gets no default: there is no protocol-free secret to resolve, and a
+         consumer that forgets to bind it should fail at compile rather than sign with an empty string. -->
 </config>
