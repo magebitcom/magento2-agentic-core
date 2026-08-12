@@ -157,8 +157,17 @@ class DispatcherTest extends TestCase
         $provider = $this->createMock(DeliveryHeadersProviderInterface::class);
         $provider->expects($this->once())
             ->method('getHeaders')
-            ->with(self::SCOPE, self::PAYLOAD, self::NOW_TIMESTAMP, 'ref-1')
-            ->willReturn([]);
+            ->with($this->anything(), self::NOW_TIMESTAMP)
+            ->willReturnCallback(
+                function (WebhookDeliveryInterface $delivery, int $attemptTimestamp): array {
+                    // The delivery carries the event; the timestamp is this attempt's.
+                    $this->assertSame(self::PAYLOAD, $delivery->getPayload());
+                    $this->assertSame('ref-1', $delivery->getReference());
+                    $this->assertSame(self::NOW_TIMESTAMP, $attemptTimestamp);
+
+                    return [];
+                }
+            );
 
         $this->dispatcherWith($provider)->dispatchDue(self::SCOPE);
     }

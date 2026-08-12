@@ -117,7 +117,7 @@ class Dispatcher
             $payload,
             // Built per attempt, not per enqueue: a row that waited out a backoff would otherwise
             // arrive with a timestamp outside the receiver's skew window.
-            $this->headersProvider->getHeaders($scope, $payload, $now, $reference),
+            $this->headersProvider->getHeaders($delivery, $now),
             $reference
         );
 
