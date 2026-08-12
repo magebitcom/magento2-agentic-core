@@ -1,0 +1,21 @@
+{
+    "name": "magebitcom/magento2-module-agentic-core",
+    "version": "0.1.0",
+    "description": "Shared commerce primitives for Magebit's agentic commerce modules",
+    "type": "magento2-module",
+    "require": {
+        "magento/framework": "*",
+        "php": ">=8.2"
+    },
+    "license": [
+        "MIT"
+    ],
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Magebit\\AgenticCore\\": ""
+        }
+    }
+}
