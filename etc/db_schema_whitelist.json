@@ -55,5 +55,24 @@
             "AGENTIC_CHECKOUT_ORDER_LINK_QUOTE_ID_QUOTE_ENTITY_ID": true,
             "AGENTIC_CHECKOUT_ORDER_LINK_ORDER_ID_SALES_ORDER_ENTITY_ID": true
         }
+    },
+    "agentic_signing_key": {
+        "column": {
+            "entity_id": true,
+            "scope": true,
+            "store_id": true,
+            "kid": true,
+            "public_jwk": true,
+            "private_key": true,
+            "is_active": true,
+            "created_at": true
+        },
+        "index": {
+            "AGENTIC_SIGNING_KEY_SCOPE_STORE_ID_IS_ACTIVE": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AGENTIC_SIGNING_KEY_SCOPE_STORE_ID_KID": true
+        }
     }
 }

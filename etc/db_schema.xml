@@ -72,4 +72,28 @@
         <constraint xsi:type="foreign" referenceId="AGENTIC_CHECKOUT_ORDER_LINK_QUOTE_ID_QUOTE_ENTITY_ID" table="agentic_checkout_order_link" column="quote_id" referenceTable="quote" referenceColumn="entity_id" onDelete="SET NULL"/>
         <constraint xsi:type="foreign" referenceId="AGENTIC_CHECKOUT_ORDER_LINK_ORDER_ID_SALES_ORDER_ENTITY_ID" table="agentic_checkout_order_link" column="order_id" referenceTable="sales_order" referenceColumn="entity_id" onDelete="CASCADE"/>
     </table>
+    <table name="agentic_signing_key" resource="default" engine="innodb" comment="Key pairs used to sign outbound messages">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="varchar" name="scope" nullable="false" length="32" comment="Which caller owns this row"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" default="0" comment="Store the key belongs to"/>
+        <column xsi:type="varchar" name="kid" nullable="false" length="64" comment="Key id a verifier matches against the published key"/>
+        <column xsi:type="text" name="public_jwk" nullable="false" comment="Public half, as published in the discovery profile"/>
+        <!-- Encrypted, so a database dump does not hand over the ability to sign as this merchant. -->
+        <column xsi:type="text" name="private_key" nullable="false" comment="Private half, encrypted at rest"/>
+        <column xsi:type="boolean" name="is_active" nullable="false" default="1" comment="Whether new messages may be signed with this key"/>
+        <column xsi:type="datetime" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="AGENTIC_SIGNING_KEY_SCOPE_STORE_ID_KID">
+            <column name="scope"/>
+            <column name="store_id"/>
+            <column name="kid"/>
+        </constraint>
+        <index referenceId="AGENTIC_SIGNING_KEY_SCOPE_STORE_ID_IS_ACTIVE" indexType="btree">
+            <column name="scope"/>
+            <column name="store_id"/>
+            <column name="is_active"/>
+        </index>
+    </table>
 </schema>

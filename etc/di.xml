@@ -17,6 +17,8 @@
     <!-- SecretProviderInterface gets no default: there is no protocol-free secret to resolve, and a
          consumer that forgets to bind it should fail at compile rather than sign with an empty string. -->
 
+    <preference for="Magebit\AgenticCore\Api\Data\SigningKeyInterface" type="Magebit\AgenticCore\Model\Signature\Key"/>
+    <preference for="Magebit\AgenticCore\Api\SigningKeyRepositoryInterface" type="Magebit\AgenticCore\Model\Signature\Repository"/>
     <preference for="Magebit\AgenticCore\Api\Data\OrderLinkInterface" type="Magebit\AgenticCore\Model\OrderLink\Link"/>
     <preference for="Magebit\AgenticCore\Api\OrderLinkRepositoryInterface" type="Magebit\AgenticCore\Model\OrderLink\Repository"/>
 </config>
