@@ -71,6 +71,23 @@ class Repository implements OrderLinkRepositoryInterface
     /**
      * @inheritDoc
      */
+    public function findScope(int $orderId): ?string
+    {
+        $collection = $this->collectionFactory->create();
+        $collection->addFieldToFilter(OrderLinkInterface::ORDER_ID, ['eq' => $orderId]);
+        $collection->setPageSize(1);
+
+        /** @var OrderLinkInterface|null $link */
+        $link = $collection->getFirstItem();
+
+        return $link && $link->getEntityId() ? $link->getScope() : null;
+    }
+
+    /**
+     * @param string $scope
+     * @param int $orderId
+     * @return string|null
+     */
     public function findSessionId(string $scope, int $orderId): ?string
     {
         $collection = $this->collectionFactory->create();

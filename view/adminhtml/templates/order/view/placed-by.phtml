@@ -1,0 +1,31 @@
+<?php
+/**
+ * This file is part of the Magebit_AgenticCore package.
+ *
+ * @copyright Copyright (c) 2026 Magebit, Ltd. (https://magebit.com/)
+ * @author    Magebit <info@magebit.com>
+ * @license   MIT
+ */
+
+/** @var \Magebit\AgenticCore\Block\Adminhtml\Order\View\PlacedBy $block */
+$label = $block->getLabel();
+?>
+<?php if ($label !== null) : ?>
+    <div class="magebit-agentic-placed-by">
+        <span class="magebit-agentic-badge"><?= $block->escapeHtml($label) ?></span>
+    </div>
+    <style>
+        .magebit-agentic-placed-by { margin: 0 0 1.5rem; }
+        .magebit-agentic-badge {
+            display: inline-block;
+            padding: .4rem 1rem;
+            border-radius: 1.2rem;
+            background: #eef4fb;
+            border: .1rem solid #adc7e3;
+            color: #1a4b7c;
+            font-size: 1.2rem;
+            font-weight: 600;
+            line-height: 1.6;
+        }
+    </style>
+<?php endif; ?>

@@ -47,4 +47,13 @@ interface OrderLinkRepositoryInterface
      * @return string|null Null when the order came from no session in this scope.
      */
     public function findSessionId(string $scope, int $orderId): ?string;
+
+    /**
+     * Which caller placed an order, or null when no caller of this kind did. The scope is the only
+     * record of it, so nothing needs stamping on the order itself.
+     *
+     * @param int $orderId
+     * @return string|null
+     */
+    public function findScope(int $orderId): ?string;
 }
