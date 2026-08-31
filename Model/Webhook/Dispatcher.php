@@ -31,13 +31,17 @@ class Dispatcher
     public const MAX_ATTEMPTS = 8;
 
     /**
-     * Ceiling on the exponential wait. Set below the largest wait the squared growth would otherwise
-     * reach before MAX_ATTEMPTS runs out, so it is a live limit rather than an unreachable guard: the
-     * whole sequence spans roughly two hours.
+     * How long to wait before each retry, first retry first. The first is almost immediate, because a
+     * failed delivery is usually a momentary blip and a receiver that is already back should not be
+     * made to wait a minute. After that the waits grow hard, so one that is genuinely down is not
+     * hammered. The whole sequence spans a little over two hours, and MAX_ATTEMPTS ends it.
+     */
+    public const BACKOFF_SECONDS = [1, 60, 240, 540, 960, 1500, 1800];
+
+    /**
+     * The longest wait in the schedule.
      */
     public const MAX_BACKOFF_SECONDS = 1800;
-
-    private const BASE_BACKOFF_SECONDS = 60;
 
     /**
      * @param WebhookDeliveryRepositoryInterface $repository
@@ -154,15 +158,13 @@ class Dispatcher
     }
 
     /**
-     * Squared rather than doubled, so the wait grows 60 / 240 / 540 seconds and reaches the ceiling
-     * before the attempt count runs out.
-     *
-     * @param int $attempts
+     * @param int $attempts How many attempts have been made, including the one that just failed
      * @return int
      */
     private function backoff(int $attempts): int
     {
-        // Cast because ** widens to float even for integer operands.
-        return (int) min(self::BASE_BACKOFF_SECONDS * $attempts ** 2, self::MAX_BACKOFF_SECONDS);
+        $index = min(max($attempts, 1) - 1, count(self::BACKOFF_SECONDS) - 1);
+
+        return self::BACKOFF_SECONDS[$index];
     }
 }

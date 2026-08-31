@@ -74,7 +74,7 @@ class DispatcherTest extends TestCase
      * @return void
      * @dataProvider backoffProvider
      */
-    public function testTheRetryDelayBacksOffExponentially(int $attemptsSoFar, int $expectedDelaySeconds): void
+    public function testTheRetryDelayFollowsTheSchedule(int $attemptsSoFar, int $expectedDelaySeconds): void
     {
         $record = $this->pending($attemptsSoFar);
         $this->sender->method('send')->willReturn(new SendResult(SendOutcome::Retryable, 503));
@@ -93,11 +93,12 @@ class DispatcherTest extends TestCase
     public static function backoffProvider(): array
     {
         return [
-            'first retry waits a minute' => [0, 60],
-            'second waits four' => [1, 240],
-            'third waits nine' => [2, 540],
-            // Squared growth would ask for 2940 seconds here; the ceiling holds it down. The attempt
-            // count must stay below MAX_ATTEMPTS or the row is abandoned instead of rescheduled.
+            // A blip is retried at once rather than a minute later.
+            'first retry is almost immediate' => [0, 1],
+            'second waits a minute' => [1, 60],
+            'third waits four' => [2, 240],
+            // The schedule has run out by here, so the longest wait repeats. The attempt count must
+            // stay below MAX_ATTEMPTS or the row is abandoned instead of rescheduled.
             'the wait is capped' => [6, Dispatcher::MAX_BACKOFF_SECONDS],
         ];
     }
