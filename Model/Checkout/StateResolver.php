@@ -24,10 +24,15 @@ class StateResolver
      * @param CartInterface $quote
      * @param bool $hasOrder Whether an order has been placed against this quote
      * @param bool $isBlocked Whether readiness checks found anything preventing completion
+     * @param bool $needsBuyer Whether clearing the blockers needs something only the buyer can give
      * @return CheckoutState
      */
-    public function resolve(CartInterface $quote, bool $hasOrder, bool $isBlocked): CheckoutState
-    {
+    public function resolve(
+        CartInterface $quote,
+        bool $hasOrder,
+        bool $isBlocked,
+        bool $needsBuyer = false
+    ): CheckoutState {
         // Placing an order deactivates the quote, so an existing order has to outrank quote state —
         // otherwise every completed checkout reports itself canceled.
         if ($hasOrder) {
@@ -38,6 +43,10 @@ class StateResolver
             return CheckoutState::Canceled;
         }
 
-        return $isBlocked ? CheckoutState::Incomplete : CheckoutState::Ready;
+        if (!$isBlocked) {
+            return CheckoutState::Ready;
+        }
+
+        return $needsBuyer ? CheckoutState::RequiresEscalation : CheckoutState::Incomplete;
     }
 }

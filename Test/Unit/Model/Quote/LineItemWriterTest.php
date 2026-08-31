@@ -14,6 +14,8 @@ namespace Magebit\AgenticCore\Test\Unit\Model\Quote;
 
 use Magebit\AgenticCore\Model\Quote\LineItemOutcome;
 use Magebit\AgenticCore\Model\Quote\LineItemWriter;
+use Magebit\AgenticCore\Model\Quote\QuantityCheck;
+use Magebit\AgenticCore\Model\Quote\QuantityRefusal;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product;
 use Magento\Framework\Exception\LocalizedException;
@@ -27,6 +29,8 @@ class LineItemWriterTest extends TestCase
 {
     private ProductRepositoryInterface&MockObject $productRepository;
 
+    private QuantityCheck&MockObject $quantityCheck;
+
     private LineItemWriter $writer;
 
     /**
@@ -35,7 +39,8 @@ class LineItemWriterTest extends TestCase
     protected function setUp(): void
     {
         $this->productRepository = $this->createMock(ProductRepositoryInterface::class);
-        $this->writer = new LineItemWriter($this->productRepository);
+        $this->quantityCheck = $this->createMock(QuantityCheck::class);
+        $this->writer = new LineItemWriter($this->productRepository, $this->quantityCheck);
     }
 
     /**
@@ -159,6 +164,41 @@ class LineItemWriterTest extends TestCase
         $this->assertSame(LineItemOutcome::NotFound, $results[0]->outcome);
         $this->assertSame(LineItemOutcome::Added, $results[1]->outcome);
         $this->assertSame(1, $results[1]->index);
+    }
+
+    /**
+     * @return void
+     */
+    public function testAQuantityTheStoreCannotSupplyIsReportedBeforeAnythingIsAdded(): void
+    {
+        $quote = $this->quote();
+        $this->productRepository->method('get')->willReturn($this->salableProduct());
+        $this->quantityCheck->method('refuse')->willReturn(
+            new QuantityRefusal(LineItemOutcome::InsufficientStock, 'The requested qty is not available')
+        );
+        $quote->expects($this->never())->method('addProduct');
+
+        $results = $this->writer->write($quote, [['sku' => 'sku-1', 'quantity' => 9999]]);
+
+        $this->assertSame(LineItemOutcome::InsufficientStock, $results[0]->outcome);
+        $this->assertSame('The requested qty is not available', $results[0]->reason);
+    }
+
+    /**
+     * @return void
+     */
+    public function testAQuantityTheStoreWillNotSellInIsReported(): void
+    {
+        $quote = $this->quote();
+        $this->productRepository->method('get')->willReturn($this->salableProduct());
+        $this->quantityCheck->method('refuse')->willReturn(
+            new QuantityRefusal(LineItemOutcome::InvalidQuantity, 'The fewest you may purchase is 5.')
+        );
+
+        $results = $this->writer->write($quote, [['sku' => 'sku-1', 'quantity' => 1]]);
+
+        $this->assertSame(LineItemOutcome::InvalidQuantity, $results[0]->outcome);
+        $this->assertSame('The fewest you may purchase is 5.', $results[0]->reason);
     }
 
     /**

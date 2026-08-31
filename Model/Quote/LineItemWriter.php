@@ -22,9 +22,11 @@ class LineItemWriter
 {
     /**
      * @param ProductRepositoryInterface $productRepository
+     * @param QuantityCheck $quantityCheck
      */
     public function __construct(
-        private readonly ProductRepositoryInterface $productRepository
+        private readonly ProductRepositoryInterface $productRepository,
+        private readonly QuantityCheck $quantityCheck
     ) {
     }
 
@@ -67,6 +69,14 @@ class LineItemWriter
 
         if (!$product->isSalable()) {
             return new LineItemResult($index, $sku, LineItemOutcome::NotSalable);
+        }
+
+        // Asked before adding: Magento only reports a refused quantity while collecting totals, by
+        // which point the caller has no way to say which item it was about.
+        $refusal = $this->quantityCheck->refuse((int) $product->getId(), $quantity);
+
+        if ($refusal !== null) {
+            return new LineItemResult($index, $sku, $refusal->outcome, $refusal->reason);
         }
 
         try {

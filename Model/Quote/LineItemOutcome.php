@@ -20,5 +20,7 @@ enum LineItemOutcome
     case Added;
     case NotFound;
     case NotSalable;
+    case InsufficientStock;
+    case InvalidQuantity;
     case Rejected;
 }

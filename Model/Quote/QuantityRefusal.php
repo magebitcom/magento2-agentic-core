@@ -12,19 +12,18 @@ declare(strict_types=1);
 
 namespace Magebit\AgenticCore\Model\Quote;
 
-class LineItemResult
+/**
+ * Why the store will not sell the number of units that were asked for.
+ */
+class QuantityRefusal
 {
     /**
-     * @param int $index Position in the submitted list, so a caller can build a path back to it
-     * @param string $sku
      * @param LineItemOutcome $outcome
-     * @param string|null $reason Why it was refused; absent when the item was added
+     * @param string $reason Magento's own wording, which names the actual limit
      */
     public function __construct(
-        public readonly int $index,
-        public readonly string $sku,
         public readonly LineItemOutcome $outcome,
-        public readonly ?string $reason = null
+        public readonly string $reason
     ) {
     }
 }

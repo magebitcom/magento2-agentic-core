@@ -13,13 +13,14 @@ declare(strict_types=1);
 namespace Magebit\AgenticCore\Model\Checkout;
 
 /**
- * The four states a checkout can be in, independent of what any protocol calls them. Callers map
- * each case onto their own vocabulary, so adding a name upstream never reaches this enum.
+ * The states a checkout can be in, independent of what any protocol calls them. Callers map each case
+ * onto their own vocabulary, so adding a name upstream never reaches this enum.
  */
 enum CheckoutState
 {
     case Completed;
     case Canceled;
     case Incomplete;
+    case RequiresEscalation;
     case Ready;
 }
