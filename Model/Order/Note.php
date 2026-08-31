@@ -18,10 +18,10 @@ use Magento\Sales\Model\Order;
 use Psr\Log\LoggerInterface;
 
 /**
- * Records on the order how it was placed, so a merchant reading the order in admin can see it came from
- * an agent rather than the storefront. The caller supplies the label; this class names no protocol.
+ * Writes an internal note onto an order, so whoever reads the order in admin can see what an agent did.
+ * The caller supplies the wording; this class names no protocol.
  */
-class PlacementNote
+class Note
 {
     /**
      * @param OrderRepositoryInterface $orderRepository
@@ -35,7 +35,7 @@ class PlacementNote
 
     /**
      * @param OrderInterface $order
-     * @param string $note What to record, e.g. the name of the protocol that placed the order
+     * @param string $note What to record, e.g. that an agent placed the order
      * @return void
      */
     public function add(OrderInterface $order, string $note): void
@@ -47,13 +47,13 @@ class PlacementNote
         try {
             // Not customer-notified and not visible on the storefront: this is an internal record for
             // whoever is looking at the order, not a message to the buyer.
-            // Saved here: addCommentToStatusHistory only stages the entry in memory, and nothing else
-            // on the placement path saves the order again.
+            // Saved here: addCommentToStatusHistory only stages the entry in memory, and the caller
+            // has no other reason to save the order again.
             $order->addCommentToStatusHistory($note, false, false);
             $this->orderRepository->save($order);
         } catch (\Throwable $exception) {
-            // The order is already placed. A note that cannot be written must not undo it.
-            $this->logger->error('Could not record how an order was placed', [
+            // The order already exists. A note that cannot be written must not undo what it describes.
+            $this->logger->error('Could not write a note onto an order', [
                 'exception' => $exception,
                 'order_id' => $order->getIncrementId(),
             ]);
