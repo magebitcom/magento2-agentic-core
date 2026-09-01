@@ -48,25 +48,16 @@ class EcdsaP256SignerTest extends TestCase
     }
 
     /**
-     * P-256 is 32 bytes of r and 32 of s.
+     * P-256 is 32 bytes of r and 32 of s. The length is also what proves the signature is not DER,
+     * which OpenSSL emits by default and the spec forbids: DER wraps the pair in a SEQUENCE and never
+     * comes to 64 bytes. A separate test used to check the leading SEQUENCE byte instead and failed
+     * about one run in 256, because `r` is random and starts with 0x30 as often as with anything else.
      *
      * @return void
      */
     public function testProducesSixtyFourRawBytes(): void
     {
         $this->assertSame(64, strlen($this->signer->sign(self::MESSAGE, $this->privateKey)));
-    }
-
-    /**
-     * OpenSSL emits DER by default and the spec forbids it, so the tell is the leading SEQUENCE byte.
-     *
-     * @return void
-     */
-    public function testDoesNotProduceDer(): void
-    {
-        $signature = $this->signer->sign(self::MESSAGE, $this->privateKey);
-
-        $this->assertNotSame("\x30", $signature[0]);
     }
 
     /**
