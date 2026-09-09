@@ -143,6 +143,23 @@ class RequestValidatorTest extends TestCase
     }
 
     /**
+     * A list of plain strings gets no element type to build, so a rule on its entries can only be
+     * carried on the list itself. Unenforced, an entry the schema rejects passes.
+     *
+     * @return void
+     */
+    public function testARuleOnAListsEntriesIsEnforcedAtItsPosition(): void
+    {
+        $order = $this->order();
+        $order['images'] = ['https://example.com/a.png', 'not-a-url'];
+
+        $errors = $this->validator->validate($order, OrderInterface::class)->getErrors();
+
+        $this->assertArrayHasKey('images.1', $errors);
+        $this->assertArrayNotHasKey('images.0', $errors);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function order(): array
@@ -154,6 +171,7 @@ class RequestValidatorTest extends TestCase
             'note' => 'EN-leave at door',
             'quantity' => 2,
             'items' => [['sku' => 'ok']],
+            'images' => ['https://example.com/a.png'],
         ];
     }
 }

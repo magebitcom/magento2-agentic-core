@@ -24,6 +24,7 @@ interface OrderInterface
     public const KEY_NOTE = 'note';
     public const KEY_QUANTITY = 'quantity';
     public const KEY_ITEMS = 'items';
+    public const KEY_IMAGES = 'images';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_SHIPPED = 'shipped';
@@ -34,6 +35,7 @@ interface OrderInterface
         'note' => ['pattern' => '^[A-Z]{2}-'],
         'quantity' => ['minimum' => 1],
         'items' => ['minItems' => 1],
+        'images' => ['items' => ['format' => 'uri']],
     ];
 
     /**
@@ -65,4 +67,12 @@ interface OrderInterface
      * @return \Magebit\AgenticCore\Test\Unit\Model\Validation\Stub\OrderItemInterface[]|null
      */
     public function getItems(): ?array;
+
+    /**
+     * A list of plain strings, so whatever the schema said about its entries has nowhere to live
+     * but this list's own rules.
+     *
+     * @return string[]|null
+     */
+    public function getImages(): ?array;
 }

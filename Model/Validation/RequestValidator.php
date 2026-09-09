@@ -131,15 +131,14 @@ class RequestValidator
                 return [$pathPrefix => sprintf('Field "%s" must be an array', basename($pathPrefix))];
             }
 
-            $broken = $this->constraintChecker->check(
-                basename($pathPrefix),
-                $value,
-                $this->rulesFor($method)
-            );
+            $rules = $this->rulesFor($method);
+            $broken = $this->constraintChecker->check(basename($pathPrefix), $value, $rules);
 
             if ($broken !== null) {
                 return [$pathPrefix => $broken];
             }
+
+            $errors = $this->validateElements($value, $rules, $pathPrefix);
 
             // Try to extract array element type from PHPDoc
             $elementType = $this->extractArrayElementType($method);
@@ -204,6 +203,37 @@ class RequestValidator
 
             $nestedErrors = $this->validateClass($value, new ReflectionClass($typeName), $pathPrefix);
             return $nestedErrors;
+        }
+
+        return $errors;
+    }
+
+    /**
+     * A list of plain strings or numbers has no element type to build, so whatever the schema said
+     * about its entries is nested under `items` rather than sitting on an interface of its own.
+     *
+     * @param array<mixed> $values
+     * @param array<string, mixed> $rules Rules for the list itself
+     * @param string $pathPrefix
+     * @return array<string, string>
+     */
+    private function validateElements(array $values, array $rules, string $pathPrefix): array
+    {
+        $itemRules = $rules['items'] ?? null;
+
+        if (!is_array($itemRules) || $itemRules === []) {
+            return [];
+        }
+
+        /** @var array<string, mixed> $itemRules */
+        $errors = [];
+
+        foreach ($values as $index => $value) {
+            $broken = $this->constraintChecker->check(basename($pathPrefix), $value, $itemRules);
+
+            if ($broken !== null) {
+                $errors["$pathPrefix.$index"] = $broken;
+            }
         }
 
         return $errors;
