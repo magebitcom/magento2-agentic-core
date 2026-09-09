@@ -1,0 +1,203 @@
+name: Release
+
+# Manual, like the spec libraries: releasing is a decision, not a consequence of pushing.
+# What is *not* a decision is the number, which is read off the conventional commits since the
+# last tag rather than typed in and got wrong.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override the computed version, without the leading v. Leave blank to let the commits decide.'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as a pre-release'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Run every check and report the version, but do not tag or publish'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      # The defining rule of this module: it must not know which protocol is calling it. Naming one
+      # is the cheapest detectable proxy for a class that would have to change when either spec
+      # releases. Checked first, because a violation invalidates the whole point of the package.
+      - name: Base module is protocol-free
+        run: |
+          if HITS=$(grep -rniE 'ucp|acp|agenticcommerce|universalcommerce' \
+              --include='*.php' --include='*.xml' --include='*.json' --include='*.phtml' . \
+              | grep -v '^./.github/'); then
+            echo "::error::This module names a protocol. Move the class to the module that owns it."
+            echo "$HITS"
+            exit 1
+          fi
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish --no-check-all
+
+      # Packagist derives versions from tags. A `version` field here would go stale the moment this
+      # workflow tags anything, and would then quietly win over the tag.
+      - name: composer.json declares no version
+        run: |
+          if [ "$(jq 'has("version")' composer.json)" = "true" ]; then
+            echo "::error::Remove the version field from composer.json; the tag is the version."
+            exit 1
+          fi
+
+      # There is no test step. This module's tests need a Magento framework install, which needs
+      # repo.magento.com credentials, so they run in the project via d/check rather than here.
+      # Linting is what can be done without the framework, and it still catches a broken release.
+      - name: Lint every PHP file
+        run: find . -name '*.php' -not -path './.github/*' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: Work out the version
+        id: version
+        run: |
+          set -euo pipefail
+
+          # Held in variables because bash parses an inline regex in [[ =~ ]] before matching it.
+          BREAKING_RE='^[a-z]+(\([^)]*\))?!:'
+          FEAT_RE='^feat(\([^)]*\))?:'
+          PATCH_RE='^(fix|perf)(\([^)]*\))?:'
+
+          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
+
+          # The first release is a judgement about what the package is worth calling, not something
+          # to derive from commits. Tag it by hand; every one after it is worked out from here.
+          if [ -z "$PREV_TAG" ]; then
+            echo "::error::No release to count from. Tag the first one by hand, then this takes over."
+            exit 1
+          fi
+
+          BASE="${PREV_TAG#v}"
+          RANGE="${PREV_TAG}..HEAD"
+          echo "Previous release $PREV_TAG; reading $RANGE."
+
+          # A breaking change is either the `!` marker or a BREAKING CHANGE footer. Read from the
+          # full message, not the subject, because the footer is in the body.
+          BUMP='none'
+          while IFS= read -r -d '' MESSAGE; do
+            SUBJECT="${MESSAGE%%$'\n'*}"
+
+            if [[ "$SUBJECT" =~ $BREAKING_RE ]] || [[ "$MESSAGE" == *'BREAKING CHANGE'* ]]; then
+              BUMP='major'
+              break
+            fi
+            if [[ "$SUBJECT" =~ $FEAT_RE ]]; then
+              BUMP='minor'
+            elif [[ "$SUBJECT" =~ $PATCH_RE ]] && [ "$BUMP" = 'none' ]; then
+              BUMP='patch'
+            fi
+          done < <(git log -z --format='%B' "$RANGE")
+
+          IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+
+          # Below 1.0.0 the minor is the breaking position, so each signal drops one place. This is
+          # what semantic-release does for 0.x, and it is what keeps a `^0.x` consumer resolvable.
+          DEMOTED='no'
+          if [ "$MAJOR" -eq 0 ]; then
+            case "$BUMP" in
+              major) BUMP='minor'; DEMOTED='yes' ;;
+              minor) BUMP='patch'; DEMOTED='yes' ;;
+            esac
+          fi
+
+          case "$BUMP" in
+            major) NEXT="$((MAJOR + 1)).0.0" ;;
+            minor) NEXT="${MAJOR}.$((MINOR + 1)).0" ;;
+            patch) NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+            none)
+              echo "::error::No feat, fix, perf or breaking change since $PREV_TAG. Nothing to release."
+              exit 1
+              ;;
+          esac
+
+          OVERRIDE='${{ inputs.version }}'
+          if [ -n "$OVERRIDE" ]; then
+            if [[ ! "$OVERRIDE" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::'$OVERRIDE' is not semver MAJOR.MINOR.PATCH[-prerelease]."
+              exit 1
+            fi
+            echo "Commits computed $NEXT; overridden to $OVERRIDE."
+            NEXT="$OVERRIDE"
+          fi
+
+          if git rev-parse "v$NEXT" >/dev/null 2>&1; then
+            echo "::error::Tag v$NEXT already exists. Releases are immutable."
+            exit 1
+          fi
+
+          {
+            echo "VERSION=$NEXT"
+            echo "PREV_TAG=$PREV_TAG"
+            echo "BUMP=$BUMP"
+            echo "DEMOTED=$DEMOTED"
+            echo "RANGE=$RANGE"
+          } >> "$GITHUB_ENV"
+
+      # A commit with no conventional prefix carries no signal, so it cannot raise the version.
+      # Reported rather than failed: this module has pre-convention history, and refusing to
+      # release because of a commit already merged helps nobody.
+      - name: Report commits that carried no signal
+        run: |
+          UNCLASSIFIED=$(git log --format='%s' "$RANGE" \
+            | grep -vE '^(feat|fix|perf|docs|style|refactor|test|build|ci|chore|revert)(\([^)]*\))?!?: ' || true)
+
+          if [ -n "$UNCLASSIFIED" ]; then
+            echo "::warning::These commits are not conventional, so they did not affect the version:"
+            echo "$UNCLASSIFIED"
+          fi
+
+      - name: Warn when a 0.x consumer will have to widen its constraint
+        run: |
+          if [ "${VERSION%%.*}" = '0' ] && [ "$BUMP" = 'minor' ]; then
+            echo "::warning::v$VERSION moves the 0.x minor, so a consumer pinned to a caret range on the previous minor will stop resolving. Widen those constraints in the same change."
+          fi
+
+      - name: Tag and release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            ${{ inputs.prerelease && '--prerelease' || '' }} \
+            --notes "A \`$BUMP\` release, worked out from the conventional commits since \`$PREV_TAG\`."
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### v${VERSION:-?} (${BUMP:-?})"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Previous | \`${PREV_TAG:-?}\` |"
+            echo "| Bump | \`${BUMP:-?}\` |"
+            echo "| Dropped one place for 0.x | ${DEMOTED:-?} |"
+            echo "| Tagged | ${{ inputs.dry_run && 'no, dry run' || 'yes' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
