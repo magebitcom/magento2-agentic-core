@@ -33,9 +33,9 @@ jobs:
       - name: Validate composer.json
         run: composer validate --strict --no-check-publish --no-check-all
 
-      # There is no test step. This module's tests need a Magento framework install, and therefore
-      # repo.magento.com credentials, so they run in the project through d/check. A lint is what can
-      # be done without the framework, and it still catches a release nobody can load.
+      # No test step here: ci.yml already runs the unit tests and PHPStan against a real Magento
+      # install on every push and pull request, so nothing reaches this workflow untested. A lint is
+      # a cheap last look at what is about to be tagged.
       - name: Lint every PHP file
         run: find . -name '*.php' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
 
